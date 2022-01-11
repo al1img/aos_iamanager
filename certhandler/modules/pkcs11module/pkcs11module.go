@@ -762,27 +762,36 @@ func (module *PKCS11Module) releaseContext() (err error) {
 	return aoserrors.Wrap(err)
 }
 
-func (module *PKCS11Module) getSession(userLogin bool) (session pkcs11.SessionHandle, err error) {
+func (module *PKCS11Module) getSessionInfo() (info pkcs11.SessionInfo, session pkcs11.SessionHandle, err error) {
 	session = module.session
 
-	info, err := module.ctx.GetSessionInfo(module.session)
+	info, err = module.ctx.GetSessionInfo(module.session)
 	if err != nil {
 		var pkcs11Err pkcs11.Error
 
 		if !errors.As(err, &pkcs11Err) || pkcs11Err != pkcs11.CKR_SESSION_HANDLE_INVALID {
-			return 0, aoserrors.Wrap(err)
+			return info, session, aoserrors.Wrap(err)
 		}
 
-		if session, err = module.ctx.OpenSession(module.slotID,
-			pkcs11.CKF_SERIAL_SESSION|pkcs11.CKF_RW_SESSION); err != nil {
-			return 0, aoserrors.Wrap(err)
+		session, err = module.ctx.OpenSession(module.slotID, pkcs11.CKF_SERIAL_SESSION|pkcs11.CKF_RW_SESSION)
+		if err != nil {
+			return info, session, aoserrors.Wrap(err)
 		}
 
 		log.WithFields(log.Fields{"session": session, "slotID": module.slotID}).Debug("Open session")
 
 		if info, err = module.ctx.GetSessionInfo(session); err != nil {
-			return 0, aoserrors.Wrap(err)
+			return info, session, aoserrors.Wrap(err)
 		}
+	}
+
+	return info, session, nil
+}
+
+func (module *PKCS11Module) getSession(userLogin bool) (session pkcs11.SessionHandle, err error) {
+	info, session, err := module.getSessionInfo()
+	if err != nil {
+		return 0, aoserrors.Wrap(err)
 	}
 
 	isUserLoggedIn := info.State == CKS_RO_USER_FUNCTIONS || info.State == CKS_RW_USER_FUNCTIONS
