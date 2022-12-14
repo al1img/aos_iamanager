@@ -125,6 +125,10 @@ func (handler *Handler) GetSubjects() (subjects []string, err error) {
 
 // SubjectsChangedChannel returns subjects changed channel.
 func (handler *Handler) SubjectsChangedChannel() (channel <-chan []string) {
+	if handler.module == nil {
+		return nil
+	}
+
 	return handler.module.SubjectsChangedChannel()
 }
 
